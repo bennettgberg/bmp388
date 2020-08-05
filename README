@@ -1,0 +1,23 @@
+Bennett Greenberg, Dan Marlow
+Princeton University 
+bennettg@princeton.edu
+
+Repository for all raspberry pi code for using BMP388 sensors to measure pressure difference and estimate a flow rate.
+
+bmp388.py: functions for reading from and writing to the bmp388 sensors. Most of the code is borrowed from: 
+		 https://github.com/getelectronics/PIBits/blob/master/python/bmp388.py
+plotP.py: run a test for a certain time, taking pressure and temperature measurements at regular intervals. Or plot the results from one of these tests.
+plotHist.py: plot a histogram of the results from a run of plotP.py (to visualize the average, stdev)
+labjack_bpg.py: Control and read from the labjack instrument, which fixes a flow rate of gas across it. 
+		(Used for finding and testing the relationship between pressure readings and flow rate.)
+		(Code mostly borrowed from Peter Meyers (but he borrowed it from somewhere else too...))
+fit_meas.py: take the results of the flow rate from the labjack readings and the pressure readings from plotP.py/plotHist.py and fit them to a straight line
+		to obtain an approximate relationship between pressure reading and actual flow rate.
+plotFlow.py: Take pressure measurements and convert them to a flow rate, displaying a graph of the results in real time.
+viewFlow.py: Helper code to plotFlow.py; animates the graph in real time.
+		Important note: Make sure to close the window before killing plotFlow.py, or else the viewFlow.py background process will not be killed.
+findCorrelation.py: makes scatter plot of some variable vs. difference in pressure between 2 sensors' readings to try to find a correlation between them.
+			(I have yet to find any correlation, this pressure difference seems to change randomly.)
+
+labjack_bpg.py requires 2 more repositories to run, but it also requires a labjack(TM) instrument connected to your USB port (I used my laptop, not the raspberry pi).
+Other code should be standalone.
