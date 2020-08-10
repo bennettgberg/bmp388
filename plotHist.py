@@ -98,7 +98,7 @@ def fit_hist(filename, sampling_rate=50, t_meas=24, flow=False, show=False):
 
 def full_test():
     #test number
-    testn = 3
+    testn = 5
     show = False #True #show plots or nah
     sampling_rate = 50 #Hz
     t_meas = 24 #s

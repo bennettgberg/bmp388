@@ -30,8 +30,13 @@ def animate(i):
 #        print("line = {}".format(line))
         ws = line.split()
         for w in ws:
+            try:
+                wf = float(w)
+            except:
+                print("Error: {} not a valid float!".format(w))
+                continue
+            y.append(wf)
             count += 1
-            y.append(float(w))
 
     pltfile.close()
     end_time = time.time()

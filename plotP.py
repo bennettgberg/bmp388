@@ -5,6 +5,7 @@ import math
 import bmp388
 from matplotlib import pyplot as plt
 import sys
+import plotFlow
 
 #if diff is True, plot pressure difference instead of absolute pressures.
 #if temp is True, plot temperature instead of pressure.
@@ -44,9 +45,9 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
         t[j] = float(words[0])
         p0[j] = float(words[1])
         p1[j] = float(words[2])
-        dp[j] = abs(p1[j] - p0[j])
-        if dp[j] < 20:
-            print("p0= {}, p1={}, dp={}".format(p0[j], p1[j], dp[j]))
+        dp[j] = (p0[j] - p1[j])
+     #   if dp[j] < 20:
+     #       print("p0= {}, p1={}, dp={}".format(p0[j], p1[j], dp[j]))
         t0[j] = float(words[3])
         t1[j] = float(words[4])
         dt[j] = abs(t1[j] - t0[j])
@@ -138,7 +139,7 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
         plt.plot(t_a, p2_a)
     elif not temp:
         #pressure difference
-        plt.plot(t_a, dp_a)
+#        plt.plot(t_a, dp_a)
         plt.plot(t_a, dp0_a)
         plt.plot(t_a, dp1_a)
     elif not diff:
@@ -229,19 +230,20 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
   #  en = b1._read_byte(0x1B)
   #  print("on?: enabled: {0:b}".format(en))
     
+#    while True:
+#        try:
+#            #put in 'forced' mode, ie sleep between readings.
+#            b0._write_byte(0x1B, 0b100011)
+#            temperature,pressure,altitude = b0.get_temperature_and_pressure_and_altitude()
+#            b1._write_byte(0x1B, 0b100011)
+#            temperature,pressure,altitude = b1.get_temperature_and_pressure_and_altitude()
+#            b2._write_byte(0x1B, 0b100011)
+#            temperature,pressure,altitude = b2.get_temperature_and_pressure_and_altitude()
+#        except:
+#            continue
+#        break
     #Get first measurement out of the way since it's always shite
-    while True:
-        try:
-            #put in 'forced' mode, ie sleep between readings.
-            b0._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b0.get_temperature_and_pressure_and_altitude()
-            b1._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b1.get_temperature_and_pressure_and_altitude()
-            b2._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b2.get_temperature_and_pressure_and_altitude()
-        except:
-            continue
-        break
+    plotFlow.readPs(b0, b1, b2)
 
     times = [i*t/(n) for i in range(n)]  #divide by 3600 for hours, don't for seconds
     p0 = [0.0 for i in range(n)]
@@ -252,6 +254,7 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
     temp1 = [0.0 for i in range(n)]
     temp2 = [0.0 for i in range(n)]
     #write data to file so don't have to rerun just to fix graph (only if filename is provided).
+    start_time = time.time()
     for i in range(n):
         if filename != "" and i == 0:
             f = open(filename, "w")
@@ -263,44 +266,55 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
 #        print("time= {} pressure resolution= {}".format(times[i], res))
         #put in 'forced' mode, ie sleep between readings.
         #sometimes fails randomly.
-        try:
-            b0._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b0.get_temperature_and_pressure_and_altitude()
-        except:
-            print("Warning: write_byte failed for b0.")
-            continue
-      #  #read enablement
-#        en = b1._read_byte(0x1B)
-#        print("forced mode? enabled: {0:b}".format(en))
-      #  #read enablement
-   #     en = b1._read_byte(0x1B)
-   #     print("sleep mode? enabled: {0:b}".format(en))
-        p0[i] = pressure/100.0
-        temp0[i] = temperature/100.0
-       # print('time=%f Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(times[i], temperature/100.0,pressure/100.0,altitude/100.0))
-        #put in 'forced' mode, ie sleep between readings.
-        try:
-            b1._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b1.get_temperature_and_pressure_and_altitude()
-        except:
-            print("Warning: write_byte failed for b1.")
-            continue
-       #print('b1: Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(temperature/100.0,pressure/100.0,altitude/100.0))
-        p1[i] = pressure/100.0
-        temp1[i] = temperature/100.0
-        try:
-            b2._write_byte(0x1B, 0b100011)
-            temperature,pressure,altitude = b2.get_temperature_and_pressure_and_altitude()
-        except:
-            print("Warning: write_byte failed for b2.")
-            continue
-       #print('b1: Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(temperature/100.0,pressure/100.0,altitude/100.0))
-        p2[i] = pressure/100.0
-        temp2[i] = temperature/100.0
+ #       while True:
+ #           try:
+ #               b0._write_byte(0x1B, 0b100011)
+ #               temperature,pressure,altitude = b0.get_temperature_and_pressure_and_altitude()
+ #               #if the pressure reading is preposterous, get a better one.
+ #               if abs(pressure - last_p0) > 20000:
+ #                   print("Warning: b0 read preposterous pressure {} at {}".format(pressure/100.0, (time.time()-start_time)))
+ #                   continue
+ #               last_p0 = pressure
+ #               break
+ #           except:
+ #               print("Warning: write_byte failed for b0 at {}.".format((time.time()-start_time)))
+ #               continue
+ #     #  #read enablement
+##        en = b1._read_byte(0x1B)
+##        print("forced mode? enabled: {0:b}".format(en))
+ #     #  #read enablement
+ #  #     en = b1._read_byte(0x1B)
+ #  #     print("sleep mode? enabled: {0:b}".format(en))
+ #       p0[i] = pressure/100.0
+ #       temp0[i] = temperature/100.0
+ #      # print('time=%f Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(times[i], temperature/100.0,pressure/100.0,altitude/100.0))
+ #       #put in 'forced' mode, ie sleep between readings.
+ #       try:
+ #           b1._write_byte(0x1B, 0b100011)
+ #           temperature,pressure,altitude = b1.get_temperature_and_pressure_and_altitude()
+ #       except:
+ #           print("Warning: write_byte failed for b1 at {}.".format((time.time()-start_time)))
+ #           continue
+ #      #print('b1: Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(temperature/100.0,pressure/100.0,altitude/100.0))
+ #       p1[i] = pressure/100.0
+ #       temp1[i] = temperature/100.0
+ #       try:
+ #           b2._write_byte(0x1B, 0b100011)
+ #           temperature,pressure,altitude = b2.get_temperature_and_pressure_and_altitude()
+ #       except:
+ #           print("Warning: write_byte failed for b2 at {}.".format((time.time()-start_time)))
+ #           continue
+ #      #print('b1: Temperature = %.1f Pressure = %.2f  Altitude =%.2f '%(temperature/100.0,pressure/100.0,altitude/100.0))
+ #       p2[i] = pressure/100.0
+ #       temp2[i] = temperature/100.0
+        prevPs = (-1, -1, -1)
+        if i != 0:
+            prevPs = (p0[i-1], p1[i-1], p2[i-1])
+        p0[i], p1[i], p2[i], temp0[i], temp1[i], temp2[i] = plotFlow.readPs(b0, b1, b2, inc_temp=True, prevPs=prevPs)
         if filename != "":
             f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\n"%(times[i], p0[i], p1[i], temp0[i], temp1[i], p2[i], temp2[i]))
             f.close()
-        p2[i] = p1[i] - p0[i]
+       # p2[i] = p1[i] - p0[i]
 #       print(press[i])
 
 #    plt.plot(times, p0)
@@ -311,10 +325,10 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
 #    plt.show()
 
 def main():
-    filename = "press_18hrs.txt"
-    testn = 3
-    t_meas = 60*60*18 #24. #measurement time (s)
-    sampling_rate = 1.0 / 20 #Hz
+    filename = "press_15mins.txt"
+    testn = 5
+    t_meas = 60*15. #24. #measurement time (s)
+    sampling_rate = 50.0 #1.0 / 10 #Hz
 #    print("file will be saved to directory test{}.".format(testn))
     #if there's an argument, it is a label for the output filename.
     if len(sys.argv) > 1:
@@ -324,7 +338,7 @@ def main():
 #        sys.exit("Please specify pressure.")
     #filename = "press_highest_1week.txt"
     #run_test(filename, t_meas, sampling_rate)
-    plot_from_file(filename, diff=True, temp=False, navg=30, difdif=False)
+    plot_from_file(filename, diff=True, temp=False, navg=1, difdif=True)
     plt.show()
 
 if __name__ == '__main__':

@@ -13,19 +13,30 @@ def strtime():
     strt = now.strftime("%H:%M:%S")
     return strt
 
-#read both bmp388s
-def readPs(ba, bb, bc):
+#read all bmp388s
+#if inc_temp is true, include the temperature as well.
+#if prevPs are specified, discard any measurement that is preposterously different from those.
+def readPs(ba, bb, bc, inc_temp=False, prevPs=(-1,-1,-1)):
     #return the pressures read from the two bmp388 objects
     Ps = [-1., -1., -1.]
+    Ts = [-1., -1., -1.]
     for i, obj in enumerate([ba, bb, bc]):
         #account for possible exception
+        j = 0
         while True:
             try:
                 #put in 'forced' mode, ie sleep between readings.
                 obj._write_byte(0x1B, 0b100011)
                 #now get reading
-                temperature,Ps[i],altitude = obj.get_temperature_and_pressure_and_altitude()
+                Ts[i],Ps[i],altitude = obj.get_temperature_and_pressure_and_altitude()
                 Ps[i] /= 100.0
+                Ts[i] /= 100.0
+                if prevPs[i] > 0 and abs(Ps[i] - prevPs[i]) > 200:
+                    print("Warning: preposterous reading {} (previous reading {}) from {} at {}".format(Ps[i], prevPs[i], str(obj), strtime()))
+                    j += 1
+                    #if a 'preposterous' measurement is repeated many times it is probably actually right
+                    if j < 3:
+                        continue
             except KeyboardInterrupt:
                 print("Exiting.")
                 sys.exit()
@@ -33,30 +44,40 @@ def readPs(ba, bb, bc):
                 print("Warning: reading from B{} failed at {}".format(i, strtime()))
                 continue
             break
-    if abs(Ps[0] - Ps[1]) > 200 :
-        print("time: {}, Ps[0]: {}, Ps[1]: {}, dp = {}".format(strtime(), Ps[0], Ps[1], (Ps[0] - Ps[1])))
+#    if abs(Ps[0] - Ps[1]) > 200 :
+#        print("time: {}, Ps[0]: {}, Ps[1]: {}, dp = {}".format(strtime(), Ps[0], Ps[1], (Ps[0] - Ps[1])))
+    if inc_temp:
+        return Ps[0], Ps[1], Ps[2], Ts[0], Ts[1], Ts[2]
     return Ps[0], Ps[1], Ps[2]
 
 #global parameters
 sampling_rate = 50. #Hz, how often to take a measurement from the bmp388s
 t_p0 = 60. #s, time over which to average all measurements to find average differences.
 N = int(t_p0 * sampling_rate) #number of measurements to store
-update_rate = 0.5 #Hz, how often to update the plot.
+update_rate = 1.0 #0.5 #Hz, how often to update the plot.
 dt = int(1/update_rate)
+write_out = False #write to output file or nah
+testn = 45
+filen = 1  #number to assign to the end of the filename
 
 def main():
-    testn = 3
     print("Hello. Welcome to the flow rate tracker.")
     print("Using test {} for pressure to flow rate conversion.".format(testn))
+    if write_out:
+        outname = "test{}_flow_{}.txt".format(testn, filen)
+        print("Writing to file {}".format(outname))
+        outfile = open(outname, "w")
 
     fitname = "fit_test{}.txt".format(testn)
     fitfile = open(fitname, "r")
     line = fitfile.readline()
-    #for now we are just using a linear fit, so should only be one word (the slope of the line).
-    #  must calculate the y-int constantly (it changes as the day goes on).
+    #before we were just using a linear fit, so should only be one word (the slope of the line).
+    #but now we're using a sqrt fit, so we need 2 words (coeff on sqrt; y-int.)
     words = line.split()
 
-    slope = float(words[0])
+    #slope = float(words[0])
+    a = float(words[0])
+    b = float(words[1])
 
     #start p0 (y-int) at a reasonable value, will change as more measurements are taken.
 #    p0 = -75.0 
@@ -97,7 +118,8 @@ def main():
 #    pa,pb = readPs(Ba, Bb)
 
     realtot = 0. #total of last navg real dp readings (with p0 subtracted off)
-    last_update = time.time() #last time the plot was updated
+    start_time = time.time() #last time the plot was updated
+    last_update = start_time
 #    ani.FuncAnimation(fig, animate, interval=int(1.0/update_rate))
 #    plt.show()
 #    plt.ion()
@@ -115,7 +137,7 @@ def main():
             dpB = pb - pc 
             #print("dp = {}".format(dp))
             # subtract the constant offsets to find the fluctuation.
-            dp_real =  (dp-dp0_avg) - (dpA_avg - dpA) + (dpB_avg - dpB)
+            dp_real =   (dpA_avg - dpA) - (dpB_avg - dpB)  #(dp-dp0_avg)
 #            print("pa={}, pb={}, pc={}, dp={}, dpA={}, dpB={}, dpA_avg={}, dpB_avg={}, dp_real={}".format(pa,pb,pc,dp,dpA,dpB,dpA_avg,dpB_avg,dp_real))
             
             if len(vRecentP) == navg:
@@ -126,7 +148,12 @@ def main():
             #divide by the length of vRecentP so that the first navg values are also reasonable.
             dp_avg = realtot / len(vRecentP)
             #calculate the flow rate. (subtract 0.5 because that was what the slope was calculated relative to.)
-            Q = slope * dp_avg - 0.5
+#            Q = slope * dp_avg - 0.5
+            #new, more accurate formula for Q
+            direction = 1.0 #+1 for positive pressure->flow, -1 for negative
+            if dp_avg < 0.0:
+                direction = -1.0
+            Q = direction*a*(abs(dp_avg))**0.5 #+ b
             
             #update the plot file if it's time to do so.
             # (the actual plotting will be done by viewFlow.py)
@@ -145,6 +172,9 @@ def main():
                 pltfile.write(str(recentQ) + "\n")
                 pltfile.close()
                 last_update = t
+            #write to output file if it is requested.
+            if write_out:
+                outfile.write("{}\t{}\n".format((t-start_time), Q))
 
             #calculate the latest value of p0 and update the recentP array.
             if len(recentPA) == N:
@@ -180,6 +210,8 @@ def main():
 
     except KeyboardInterrupt:
         print("Ending program.")
+        if write_out:
+            outfile.close()
         #must kill the background process
 
 

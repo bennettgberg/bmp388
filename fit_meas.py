@@ -1,15 +1,20 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+show = True #show the plot or nah
+sqrt = True #fit to a sqrt or nah (in which case it would be a line).
+ln = False #fit to log or nah
+inc_big = True
+#nvals = 50/5 #50 by 5s, but not 20, but yes 0.
+nvals = 18 #1-14, 30, 35, 45, 50.
 
 #get np arrays of flow rates and pressure readings
-def get_rp(testn):
+def get_rp(testn): #, r_arr, p_arr, r_err, p_err):
     rfile = "test{}/rate_bestfit{}.txt".format(testn, testn)
     pfile = "test{}/press_bestfit{}.txt".format(testn, testn)
-    sampling_rate = 5
     #number of different flow rate values tested
-    #nvals = 50/5 #50 by 5s, but not 20, but yes 0.
-    nvals = 18 #1-14, 30, 35, 45, 50.
     #flow rates
     rates = [0. for i in range(nvals)]
     press = [0. for i in range(nvals)]
@@ -41,6 +46,10 @@ def get_rp(testn):
     p_arr = np.array(press, "f")
     r_err = np.array(rErr, "f")
     p_err = np.array(pErr, "f")
+   # r_arr = np.concatenate((r_arr, rarr))
+   # p_arr = np.concatenate((p_arr, parr))
+   # r_err = np.concatenate((r_err, rerr))
+   # p_err = np.concatenate((p_err, perr))
 
     return r_arr, p_arr, r_err, p_err
 
@@ -57,35 +66,65 @@ def plot_rp(p_arr, r_arr, p_err=[], r_err=[], show=False):
     if not show:
         plt.show()
 
+#define the square root function so you can fit to it.
+def func(x, a): #, b, c):
+    return (x+0.000001)/abs(x+0.000001) * a * (abs(x))**0.5 #((x-c)/abs(x-c))*a*(abs(x-c))**0.5 + b
+
+def func2(x, a, b, c):
+    return a*np.log(b*x) + c
+
 #linear fit for a function that should relate r_arr with p_arr
 #inc_big: include the larger-than-normal flow rates/pressures or nah?
-def fit_rp_line(p_arr, r_arr, inc_big=True, show=False):
+#p: pressure (ind. var.), r: flow rate (dep. var.)
+def fit_rp_line(p_arr, r_arr):
     
     #print("p_arr: " + str(p_arr))
     #print("r_arr: " + str(r_arr))
     if not inc_big:
         p_arr = np.delete(p_arr, [j for j in xrange(len(p_arr)-4, len(p_arr))])
         r_arr = np.delete(r_arr, [j for j in xrange(len(r_arr)-4, len(r_arr))])
-    fit = np.polyfit(p_arr, r_arr, 1)
-    print("linear fit for dp:\n slope={}, y-int={}".format(fit[0], fit[1]))
+    if ln:
+        popt, _ = curve_fit(func2, p_arr, r_arr)
+        print("sqrt popt: {}".format(str(popt)))
+    elif not sqrt:
+        #line
+        fit = np.polyfit(p_arr, r_arr, 1)
+    else:
+        #sqrt (func)
+        fit = np.polyfit(r_arr, p_arr, 2)
+
+        popt, _ = curve_fit(func, p_arr, r_arr)
+        print("sqrt fit: {}".format(str(fit)))
+        print("sqrt popt: {}".format(str(popt)))
+        #This gives us y in terms of x. Now solve for y.
+        # Use quadratic formula.
+#    print("linear fit for dp:\n slope={}, y-int={}".format(fit[0], fit[1]))
     #y-intercept (fit[1] should be close to 0).
     if show:
-        x = np.array([float(i) for i in xrange(-5, 25)])
-        y = x * fit[0] + fit[1]
+        x = np.array([float(i) for i in xrange(0, 300)])
+        if ln:
+            y = func2(x, popt[0], popt[1], popt[2])
+        elif not sqrt:
+            y = x * fit[0] + fit[1]
+        else:
+            #y = (-1*fit[1] + (fit[1]**2 - 4*fit[0]*(fit[2] - x))**0.5) / (2*fit[0])
+            y = func(x, popt[0]) #, popt[1], popt[2])
         plt.plot(x, y)
         plt.show()
-    return fit[0]
+    #return coeff on sqrt, y-int.
+    return popt[0]#, popt[1] #fit[0]
 
-def main():
-    #test number
-    testn = ""
-    if len(sys.argv) > 1:
-        testn = sys.argv[1]
-    else:
-        sys.exit("please specify test number.")
-    show = False
-    r_arr, p_arr, r_err, p_err = get_rp(testn)
-    plot_rp(p_arr, r_arr, p_err, r_err, show=show)
+#testns is list of all test names to include in the fit
+def fit_tests(testns):
+    #for each test number
+    r_arr, p_arr, r_err, p_err = np.array([]), np.array([]), np.array([]), np.array([])
+    for n in testns:
+        rarr, parr, rerr, perr = get_rp(n) #, r_arr, p_arr, r_err, p_err)
+        plot_rp(parr, rarr, perr, rerr, show=show)
+        r_arr = np.concatenate((r_arr, rarr))
+        p_arr = np.concatenate((p_arr, parr))
+        r_err = np.concatenate((r_err, rerr))
+        p_err = np.concatenate((p_err, perr))
 
     #now fit this to whatever shape it looks like.
     #constant offset is the dp at 0 flow.
@@ -96,15 +135,27 @@ def main():
 #    np.delete( r_arr, 0 )
 #    n = len(r_arr)
 #    p_arr = p_arr - p0*np.ones(n)
-    inc_big = True
-    m = fit_rp_line(p_arr, r_arr, inc_big=inc_big, show=show)
+    #m = fit_rp_line(p_arr, r_arr, inc_big=inc_big, show=show, sqrt=sqrt, ln=ln)
+    a = fit_rp_line(p_arr, r_arr) #,b
 
+    testn = ""
+    for n in testns:
+        testn += n
     #now write to output file.
     outname = "fit_test{}.txt".format(testn)
     of = open(outname, "w")
-    of.write("{}\n".format(m))
+    of.write("{}\t{}\n".format(a,a)) #b
     of.close()
     print("{} written.".format(outname))
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit("please specify test number(s).")
+    testns = []
+    for i in xrange(1, len(sys.argv)):
+        testns.append( sys.argv[i] )
+
+    fit_tests(testns)
 
 if __name__ == "__main__":
     main()
