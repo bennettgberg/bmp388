@@ -76,8 +76,9 @@ def main():
     words = line.split()
 
     #slope = float(words[0])
+    #coefficient for the function
     a = float(words[0])
-    b = float(words[1])
+#    b = float(words[1])
 
     #start p0 (y-int) at a reasonable value, will change as more measurements are taken.
 #    p0 = -75.0 
@@ -153,7 +154,7 @@ def main():
             direction = 1.0 #+1 for positive pressure->flow, -1 for negative
             if dp_avg < 0.0:
                 direction = -1.0
-            Q = direction*a*(abs(dp_avg))**0.5 #+ b
+            Q = direction*a*(abs(dp_avg))**(4.0/7.0) #+ b
             
             #update the plot file if it's time to do so.
             # (the actual plotting will be done by viewFlow.py)

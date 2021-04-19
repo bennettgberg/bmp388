@@ -58,17 +58,22 @@ def plot_rp(p_arr, r_arr, p_err=[], r_err=[], show=False):
     if r_err == []:
         plt.plot(p_arr, r_arr, "s")
     else:
-        #errorbar args: x, y, yerr, xerr
-        plt.errorbar(p_arr, r_arr, r_err, p_err, '.')
-    plt.xlabel("Pressure difference (Pa)")
-    plt.ylabel("Flow rate (L/min)")
+        #errorbar args: x, y, yerr, xerr, format ('s' for square points)
+        plt.errorbar(p_arr, r_arr, r_err, p_err, 's')
+        #option none for only error bars with no data points.
+        #plt.errorbar(p_arr, r_arr, r_err, p_err, 'none')
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.xlabel("Pressure difference (Pa)", fontsize=16)
+    plt.ylabel("Flow rate (L/min)", fontsize=16)
     plt.title("Average pressure difference vs. average flow rate")
     if not show:
         plt.show()
 
 #define the square root function so you can fit to it.
+#jk it's now x**(4/7)
 def func(x, a): #, b, c):
-    return (x+0.000001)/abs(x+0.000001) * a * (abs(x))**0.5 #((x-c)/abs(x-c))*a*(abs(x-c))**0.5 + b
+    return (x+0.000001)/abs(x+0.000001)*a*(abs(x))**(4.0/7.0) #(x+0.000001)/abs(x+0.000001) * a * (abs(x))**0.5 #((x-c)/abs(x-c))*a*(abs(x-c))**0.5 + b
 
 def func2(x, a, b, c):
     return a*np.log(b*x) + c
@@ -93,9 +98,10 @@ def fit_rp_line(p_arr, r_arr):
         #sqrt (func)
         fit = np.polyfit(r_arr, p_arr, 2)
 
-        popt, _ = curve_fit(func, p_arr, r_arr)
-        print("sqrt fit: {}".format(str(fit)))
-        print("sqrt popt: {}".format(str(popt)))
+        popt, pcov = curve_fit(func, p_arr, r_arr)
+        perr = np.sqrt(np.diag(pcov))
+#        print("sqrt fit: {}".format(str(fit)))
+        print("x^4/7 fit popt: {} +/- {}".format(str(popt), perr))
         #This gives us y in terms of x. Now solve for y.
         # Use quadratic formula.
 #    print("linear fit for dp:\n slope={}, y-int={}".format(fit[0], fit[1]))
@@ -109,7 +115,7 @@ def fit_rp_line(p_arr, r_arr):
         else:
             #y = (-1*fit[1] + (fit[1]**2 - 4*fit[0]*(fit[2] - x))**0.5) / (2*fit[0])
             y = func(x, popt[0]) #, popt[1], popt[2])
-        plt.plot(x, y)
+        plt.plot(x, y, linewidth=3)
         plt.show()
     #return coeff on sqrt, y-int.
     return popt[0]#, popt[1] #fit[0]

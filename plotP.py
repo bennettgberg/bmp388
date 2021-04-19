@@ -26,6 +26,7 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
     dt0 = [0. for i in range(n)] #temp dif between b2 and b0
     dt1 = [0. for i in range(n)] #temp dif between b2 and b1
     count = 0
+    three_sensors = False #True if all 3 sensors are being used
     for j, line in enumerate(f):
         if j >= n:
             t.append(0.)
@@ -51,7 +52,8 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
         t0[j] = float(words[3])
         t1[j] = float(words[4])
         dt[j] = abs(t1[j] - t0[j])
-        if len(words) > 4:
+        if len(words) > 5:
+            three_sensors = True
             p2[j] = float(words[5])
             t2[j] = float(words[6])
             dp0[j] = p0[j] - p2[j]
@@ -131,30 +133,38 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
             dp0_a[i] -= dp0_avg
             dp1_a[i] -= dp1_avg
 
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
     #plot the relevant item(s)
     if not diff and not temp:
         #pressures
         plt.plot(t_a, p0_a)
         plt.plot(t_a, p1_a)
-        plt.plot(t_a, p2_a)
+        if three_sensors:
+            plt.plot(t_a, p2_a)
     elif not temp:
         #pressure difference
-#        plt.plot(t_a, dp_a)
-        plt.plot(t_a, dp0_a)
-        plt.plot(t_a, dp1_a)
+        if three_sensors:
+            plt.plot(t_a, dp0_a)
+            plt.plot(t_a, dp1_a)
+        else:
+            plt.plot(t_a, dp_a)
     elif not diff:
         #temperatures
         plt.plot(t_a, t0_a)
         plt.plot(t_a, t1_a)
-        plt.plot(t_a, t2_a)
+        if three_sensors:
+            plt.plot(t_a, t2_a)
     else:
         #temperature difference
-        plt.plot(t_a, dt_a)
-        plt.plot(t_a, dt0_a)
-        plt.plot(t_a, dt1_a)
+        if three_sensors:
+            plt.plot(t_a, dt0_a)
+            plt.plot(t_a, dt1_a)
+        else:
+            plt.plot(t_a, dt_a)
 
     #label the axes
-    plt.xlabel("time (s)")
+    plt.xlabel("time (h)", fontsize=16)
     ylab = ""
     if not temp:
         ylab += "pressure "
@@ -166,7 +176,7 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
         ylab += "(deg. C)"
     else:
         ylab += "(Pa)"
-    plt.ylabel(ylab)
+    plt.ylabel(ylab, fontsize=16)
 #    plt.xticks([int(t[j]) for j in range(0, n, 60)])
     #get max, min y values to set reasonable tick marks.
 #    ymin = float('inf')
@@ -190,25 +200,29 @@ def plot_from_file(filename="pressures.txt", n=60*5, diff=False, temp=False, nav
     if navg != 1:
         title += " avg. over %d measurements"%(navg)
     plt.title(title)
+
+#    plt.rcParams.update({'font.size': 16})
 #    plt.show()
 
 #filename is file to write data to (to save time)
 #t_meas is total time to take measurements (in seconds)
 #sampling_rate is how many times per second to take a measurement.
-def run_test(filename="", t_meas=120., sampling_rate=5.):
+def run_test(filename="", t_meas=120., sampling_rate=5., use1=False):
     t = t_meas #time in seconds to run the test
     n = int(round(t*sampling_rate))  #number of measurements to take
     b0 = bmp388.BMP388()  #default address is 0x77
-    b1 = bmp388.BMP388(0x76)
-    b2 = bmp388.BMP388(0x77, 0x06)
+    if not use1:
+        b1 = bmp388.BMP388(0x76)
+        b2 = bmp388.BMP388(0x77, 0x06)
     #read enablement
   #  en = b1._read_byte(0x1B)
   #  print("before: enabled: {0:b}".format(en))
 
     #set resolution
     b0.set_osrp(32)
-    b1.set_osrp(32)
-    b2.set_osrp(32)
+    if not use1:
+        b1.set_osrp(32)
+        b2.set_osrp(32)
     #read resolution
   #  res = b1._read_byte(0x1C)
   #  print("pressure resolution: {0:b}".format(res))
@@ -217,8 +231,9 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
  #   print("after: enabled: {0:b}".format(en))
     #put in 'sleep' mode, required before going into forced mode
     b0._write_byte(0x1B, 0b000011)
-    b1._write_byte(0x1B, 0b000011)
-    b2._write_byte(0x1B, 0b000011)
+    if not use1:
+        b1._write_byte(0x1B, 0b000011)
+        b2._write_byte(0x1B, 0b000011)
   #  #read enablement
    # en = b1._read_byte(0x1B)
    # print("sleep mode? enabled: {0:b}".format(en))
@@ -243,7 +258,10 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
 #            continue
 #        break
     #Get first measurement out of the way since it's always shite
-    plotFlow.readPs(b0, b1, b2)
+    if not use1:
+        plotFlow.readPs(b0, b1, b2)
+    else:
+        plotFlow.readPs(b0, b0, b0)
 
     times = [i*t/(n) for i in range(n)]  #divide by 3600 for hours, don't for seconds
     p0 = [0.0 for i in range(n)]
@@ -310,7 +328,11 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
         prevPs = (-1, -1, -1)
         if i != 0:
             prevPs = (p0[i-1], p1[i-1], p2[i-1])
-        p0[i], p1[i], p2[i], temp0[i], temp1[i], temp2[i] = plotFlow.readPs(b0, b1, b2, inc_temp=True, prevPs=prevPs)
+        if not use1:
+            p0[i], p1[i], p2[i], temp0[i], temp1[i], temp2[i] = plotFlow.readPs(b0, b1, b2, inc_temp=True, prevPs=prevPs)
+        else:
+            p0[i], p1[i], p2[i], temp0[i], temp1[i], temp2[i] = plotFlow.readPs(b0, b0, b0, inc_temp=True, prevPs=prevPs)
+
         if filename != "":
             f.write("%f\t%f\t%f\t%f\t%f\t%f\t%f\n"%(times[i], p0[i], p1[i], temp0[i], temp1[i], p2[i], temp2[i]))
             f.close()
@@ -325,21 +347,29 @@ def run_test(filename="", t_meas=120., sampling_rate=5.):
 #    plt.show()
 
 def main():
-    filename = "press_15mins.txt"
+    nmeas = 20
+    filename = "press_10_19_20.txt"
     testn = 5
-    t_meas = 60*15. #24. #measurement time (s)
-    sampling_rate = 50.0 #1.0 / 10 #Hz
+    t_meas = 10.#*15. #24. #measurement time (s)
+    sampling_rate = 1.0 #1.0 / 10 #Hz
 #    print("file will be saved to directory test{}.".format(testn))
     #if there's an argument, it is a label for the output filename.
     if len(sys.argv) > 1:
         label = sys.argv[1]
-        filename = "test{}/press_{}.txt".format(testn, label)
+#        filename = "test{}/press_{}.txt".format(testn, label)
+        filename = "press_{}.txt".format(label)
+        sampling_rate = float(label.split("_")[0])
+        t_meas = nmeas / sampling_rate
+        print("SAMPLING RATE: {} (label: {})".format(sampling_rate, label))
+
 #    else:
 #        sys.exit("Please specify pressure.")
     #filename = "press_highest_1week.txt"
-    #run_test(filename, t_meas, sampling_rate)
-    plot_from_file(filename, diff=True, temp=False, navg=1, difdif=True)
-    plt.show()
+    #set use1 True to use only 1 BMP388 instead of all 3.
+    use1 = True
+    run_test(filename, t_meas, sampling_rate, use1)
+    #plot_from_file(filename, diff=False, temp=False, navg=1, difdif=False)
+    #plt.show()
 
 if __name__ == '__main__':
     main()

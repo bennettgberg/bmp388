@@ -32,7 +32,8 @@ def fill_arr(filename, arr, flow=False, start=0): #, step=1):
             p1 = float(words[2])
             dp = abs(p0 - p1)
             #0 measurements are failed readings, as are very small dp's.
-            if p0 == 0.000000 or p1 == 0.000000 or dp < 5.0: continue
+            print("p0= {}, p1={}, dp={}".format(p0, p1, dp))
+#            if p0 == 0.000000 or p1 == 0.000000 or dp < 5.0: continue
 #            if dp < 20:
 #                print("p0={}, p1={}, dp={}".format(p0, p1, dp))
         else:
@@ -41,7 +42,8 @@ def fill_arr(filename, arr, flow=False, start=0): #, step=1):
         if len(arr) < end+1:
             print("Error: array not big enough.\narray length: {0:d}\nTrying to access index {1:d}".format(len(arr), end))
             sys.exit()
-        arr[end] = dp
+        print("appending for the {}th time".format(j))
+        arr[end] = p0#dp
         end += 1
         j += 1
     #print("j = {}".format(j))
@@ -53,7 +55,7 @@ def fill_arr(filename, arr, flow=False, start=0): #, step=1):
 #t_meas is measurement time in seconds
 def fit_hist(filename, sampling_rate=50, t_meas=24, flow=False, show=False):
 #    filenames = ["press_highest_7day.txt", "press_highest_1week.txt", "press_highest_2day.txt"]  #could use press_highest_2day.txt but it has different time increments
-    n = t_meas * sampling_rate
+    n = int(t_meas * sampling_rate)
     #print("n= {}".format(n))
     #pressure differences, to be histogrammed
     #dps = np.zeros(6*24*7*2+6*24*2)
@@ -81,10 +83,10 @@ def fit_hist(filename, sampling_rate=50, t_meas=24, flow=False, show=False):
 ##############################################################################
     mu, sigma = norm.fit(dps)
 
-    #have to divide sigma by sqrt(N)
-    print("sigma before: {}".format(sigma))
-    sigma = sigma / end**0.5
-    print("sigma after: {}".format(sigma))
+ ###don't do this   #have to divide sigma by sqrt(N)
+#    print("sigma before: {}".format(sigma))
+#    sigma = sigma / end**0.5
+#    print("sigma after: {}".format(sigma))
     if show:
     ##############################################################################
         plt.xlabel("pressure differences (Pa)")
@@ -132,12 +134,45 @@ def full_test():
     of.close()
     print("{} written.".format(outname))
     
+def rate_v_rms():
+    nmeas = 100
+
+    #rates to test (in Hz)
+    rates = [1000., 500., 250., 100., 50., 25., 10., 5., 2., 1.] #, 0.01]
+    RMSs = [0.0 for i in range(len(rates))]
+    #repeat the same test ntrial times (take their average) to make sure the results are significant.
+    ntrial = 10
+    for i in range(ntrial):
+        #for each rate, run plotP, get 100 samples
+        for j,rate in enumerate(rates): 
+            suffix = "{}_{}_2021".format(rate, i)
+            os.system("python plotP.py {}".format(suffix))
+            
+            inname = "press_{}.txt".format(suffix)
+            t_meas = nmeas/rate
+            mu, sigma = fit_hist(inname, rate, t_meas, show=False)
+            RMSs[j] += sigma
+            if i == ntrial-1:
+                RMSs[j] /= ntrial
+
+    plt.plot(rates, RMSs)
+    plt.xscale("log")
+    plt.title("RMS noise as a function of sampling rate for BMP388")
+    plt.xlabel("sampling rate (Hz)", fontsize=16)
+    plt.ylabel("RMS noise (Pa)", fontsize=16)
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
+    plt.show()
+
+    
 def main():
-    full_test()
-    #sampling_rate = 50
-    #t_meas = 60
-    #inname = "press_test3.txt"
-    #mu, sigma = fit_hist(inname, sampling_rate, t_meas, show=True)
+    #full_test()
+  #  sampling_rate = 1
+  #  t_meas = 34*1
+  #  inname = "press_34sec.txt"
+  #  print("Warning: filling with p0, not dp.")
+  #  mu, sigma = fit_hist(inname, sampling_rate, t_meas, show=True)
+  rate_v_rms()
 
 if __name__ == '__main__':
     main()

@@ -240,14 +240,14 @@ class BMP388(object):
 if __name__ == '__main__':
 
         import time
-        
+
         print("BMP388 Test Program ...\n")
-        
+
 #        for j in range(0x00, 0x78):
 
         j = 0x77
         bmp388 = BMP388(j, bus_addr=0x06)
-                            
+
 #       while True:
         for i in range(10):
                 time.sleep(0.5)
@@ -260,4 +260,3 @@ if __name__ == '__main__':
 #            print(":(")
 #        else:
 #            print(":)")
-
