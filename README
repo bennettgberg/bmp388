@@ -21,3 +21,8 @@ findCorrelation.py: makes scatter plot of some variable vs. difference in pressu
 
 labjack_bpg.py requires 2 more repositories to run, but it also requires a labjack(TM) instrument connected to your USB port (I used my laptop, not the raspberry pi).
 Other code should be standalone.
+
+subdirectories test4 and test5 have the data from 2 separate trials for testing pressure as a function of flow rate.
+(the final "money" plot can be generated using:
+python fit_meas.py 4 5
+)
